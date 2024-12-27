@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-storage.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        header {
+            padding: 10px;
+            background-color: #333;
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .dashboard {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .dashboard div {
+            padding: 20px;
+            background: #007BFF;
+            color: white;
+            border-radius: 5px;
+            flex: 1;
+            margin: 0 10px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        .table-container {
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        table th {
+            background-color: #007BFF;
+            color: white;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            max-width: 500px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Admin Panel</h1>
+    </header>
+    <div class="container">
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <div id="totalUsers">Total Users: Loading...</div>
+            <div id="totalProducts">Total Products: Loading...</div>
+            <div id="totalSales">Total Sales: Loading...</div>
+        </div>
+    
+        <!-- Categories -->
+        <div class="table-container">
+            <h2>Categories and Products</h2>
+            <button onclick="addCategory()">Add Category</button>
+            <div id="categoriesContainer">
+                <!-- Categories will be dynamically inserted here -->
+            </div>
+        </div>
+    
+        <!-- Users Table -->
+        <div class="table-container">
+            <h2>Users</h2>
+            <button onclick="printUsers()">Print Users</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Password</th>
+                        <th>Transactions</th>
+                        <th>Balance</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <!-- User Rows Will Be Populated Dynamically -->
+                </tbody>
+            </table>
+        </div>
+    
+        <!-- Transactions Table -->
+        <div class="table-container">
+            <h2>Transactions</h2>
+            <button onclick="printTransactions()">Print Transactions</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Transaction ID</th>
+                        <th>User</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionTableBody">
+                    <!-- Transaction Rows Will Be Populated Dynamically -->
+                </tbody>
+            </table>
+        </div>
+    
+        <!-- Withdrawal Requests Table --> 
+    <div class="container">
+        <h1>Withdrawal Requests</h1>
+        <table id="withdrawalRequestsTable">
+            <thead>
+                <tr>
+                    <th>Request ID</th>
+                    <th>User ID</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="withdrawalRequestsTableBody"></tbody>
+        </table>
+    </div>
+        <!-- Add Balance Modal -->
+        <div id="addBalanceModal" class="modal">
+            <div class="modal-content">
+                <h2>Add Balance</h2>
+                <form id="addBalanceForm">
+                    <label for="balanceAmount">Amount:</label>
+                    <input type="number" id="balanceAmount" name="balanceAmount" required>
+                    <input type="hidden" id="balanceUserId">
+                    <br><br>
+                    <button type="submit">Add Balance</button>
+                    <button type="button" onclick="closeAddBalanceModal()">Cancel</button>
+                </form>
+            </div>
+        </div>
+    
+        <!-- Edit User Modal -->
+        <div id="editUserModal" class="modal">
+            <div class="modal-content">
+                <h2>Edit User</h2>
+                <form id="editUserForm">
+                    <label for="editUserEmail">Email:</label>
+                    <input type="email" id="editUserEmail" name="editUserEmail" required>
+                    <br><br>
+                    <label for="editUserPassword">Password:</label>
+                    <input type="password" id="editUserPassword" name="editUserPassword" required>
+                    <input type="hidden" id="editUserId">
+                    <br><br>
+                    <button type="submit">Save Changes</button>
+                    <button type="button" onclick="closeEditUserModal()">Cancel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+  apiKey: "AIzaSyAfxNnPpP1Bq2sVwmJAuzc286ixJcxf9Nc",
+  authDomain: "website1-51acf.firebaseapp.com",
+  databaseURL: "https://website1-51acf-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "website1-51acf",
+  storageBucket: "website1-51acf.firebasestorage.app",
+  messagingSenderId: "138128926583",
+  appId: "1:138128926583:web:32f70db609d295ee8a2372",
+  measurementId: "G-9Y3WFTRN6B"
+};
+
+    
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const storage = firebase.storage();
+    
+        // Dashboard Data
+        function loadDashboard() {
+            database.ref('users').once('value').then(snapshot => {
+                document.getElementById('totalUsers').innerText = `Total Users: ${snapshot.numChildren()}`;
+            });
+    
+            database.ref('categories').once('value').then(snapshot => {
+                let productCount = 0;
+                snapshot.forEach(category => {
+                    productCount += category.child('products').numChildren();
+                });
+                document.getElementById('totalProducts').innerText = `Total Products: ${productCount}`;
+            });
+    
+            database.ref('transactions').once('value').then(snapshot => {
+                let totalSales = 0;
+                snapshot.forEach(transaction => {
+                    totalSales += transaction.val().amount || 0;
+                });
+                document.getElementById('totalSales').innerText = `Total Sales: KES ${totalSales.toLocaleString()}`;
+            });
+        }
+    
+        // Categories Management
+        function loadCategories() {
+            const container = document.getElementById('categoriesContainer');
+            database.ref('categories').on('value', snapshot => {
+                container.innerHTML = '';
+                snapshot.forEach(categorySnapshot => {
+                    const categoryKey = categorySnapshot.key;
+                    const category = categorySnapshot.val();
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <h3>${category.name}</h3>
+                        <button onclick="addProduct('${categoryKey}')">Add Product</button>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Price</th>
+                                    <th>Image</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.keys(category.products || {}).map(productKey => {
+                                    const product = category.products[productKey];
+                                    return `
+                                        <tr>
+                                            <td>${product.name}</td>
+                                            <td>${product.description}</td>
+                                            <td>${product.price}</td>
+                                            <td><img src="${product.imageUrl}" width="50" alt="${product.name}"></td>
+                                            <td>
+                                                <button onclick="editProduct('${categoryKey}', '${productKey}')">Edit</button>
+                                                <button onclick="deleteProduct('${categoryKey}', '${productKey}')">Delete</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    container.appendChild(div);
+                });
+            });
+        }
+    
+        function addCategory() {
+            const categoryName = prompt('Enter category name:');
+            if (categoryName) {
+                database.ref('categories').push({ name: categoryName });
+            }
+        }
+    
+        function addProduct(categoryKey) {
+            const productName = prompt('Enter product name:');
+            const productDescription = prompt('Enter product description:');
+            const productPrice = parseFloat(prompt('Enter product price:'));
+            const productImageFile = prompt('Enter product image file path:'); // Ideally, this should be a file input
+    
+            if (productName && productDescription && !isNaN(productPrice) && productImageFile) {
+                const productRef = database.ref(`categories/${categoryKey}/products`).push();
+                const storageRef = storage.ref(`products/${productRef.key}/${productImageFile.name}`);
+                storageRef.put(productImageFile).then(snapshot => {
+                    snapshot.ref.getDownloadURL().then(imageUrl => {
+                        productRef.set({
+                            name: productName,
+                            description: productDescription,
+                            price: productPrice,
+                            imageUrl: imageUrl
+                        });
+                    });
+                });
+            }
+        }
+    
+        function editProduct(categoryKey, productKey) {
+            const productRef = database.ref(`categories/${categoryKey}/products/${productKey}`);
+            productRef.once('value').then(snapshot => {
+                const product = snapshot.val();
+                const newProductName = prompt('Enter new product name:', product.name);
+                const newProductDescription = prompt('Enter new product description:', product.description);
+                const newProductPrice = parseFloat(prompt('Enter new product price:', product.price));
+                const newProductImageFile = prompt('Enter new product image file path:'); // Ideally, this should be a file input
+    
+                if (newProductName && newProductDescription && !isNaN(newProductPrice)) {
+                    if (newProductImageFile) {
+                        const storageRef = storage.ref(`products/${productKey}/${newProductImageFile.name}`);
+                        storageRef.put(newProductImageFile).then(snapshot => {
+                            snapshot.ref.getDownloadURL().then(newImageUrl => {
+                                productRef.update({
+                                    name: newProductName,
+                                    description: newProductDescription,
+                                    price: newProductPrice,
+                                    imageUrl: newImageUrl
+                                });
+                            });
+                        });
+                    } else {
+                        productRef.update({
+                            name: newProductName,
+                            description: newProductDescription,
+                            price: newProductPrice
+                        });
+                    }
+                }
+            });
+        }
+    
+        function deleteProduct(categoryKey, productKey) {
+            if (confirm('Are you sure you want to delete this product?')) {
+                database.ref(`categories/${categoryKey}/products/${productKey}`).remove();
+            }
+        }
+    
+        // Users Management
+        function loadUsers() {
+            const usersTableBody = document.getElementById('usersTableBody');
+            database.ref('users').on('value', snapshot => {
+                usersTableBody.innerHTML = '';
+                snapshot.forEach(userSnapshot => {
+                    const userId = userSnapshot.key;
+                    const user = userSnapshot.val();
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${user.email}</td>
+                        <td>${user.password}</td>
+                        <td>${user.transactions}</td>
+                        <td>${user.balance || 0}</td>
+                        <td>
+                            <button onclick="openAddBalanceModal('${userId}')">Add Balance</button>
+                            <button onclick="openEditUserModal('${userId}')">Edit</button>
+                            <button onclick="deleteUser('${userId}')">Delete</button>
+                        </td>
+                    `;
+                    usersTableBody.appendChild(tr);
+                });
+            });
+        }
+    
+        function openAddBalanceModal(userId) {
+            document.getElementById('balanceUserId').value = userId;
+            document.getElementById('addBalanceModal').style.display = 'block';
+        }
+    
+        function closeAddBalanceModal() {
+            document.getElementById('addBalanceModal').style.display = 'none';
+        }
+    
+        function openEditUserModal(userId) {
+            const userRef = database.ref(`users/${userId}`);
+            userRef.once('value').then(snapshot => {
+                const user = snapshot.val();
+                document.getElementById('editUserEmail').value = user.email;
+                document.getElementById('editUserPassword').value = user.password;
+                document.getElementById('editUserId').value = userId;
+                document.getElementById('editUserModal').style.display = 'block';
+            });
+        }
+    
+        function closeEditUserModal() {
+            document.getElementById('editUserModal').style.display = 'none';
+        }
+    
+        document.getElementById('addBalanceForm').addEventListener('submit', event => {
+            event.preventDefault();
+            const userId = document.getElementById('balanceUserId').value;
+            const amount = parseFloat(document.getElementById('balanceAmount').value);
+            const userRef = database.ref(`users/${userId}`);
+            userRef.child('balance').transaction(balance => {
+                return (balance || 0) + amount;
+            });
+            closeAddBalanceModal();
+        });
+    
+        document.getElementById('editUserForm').addEventListener('submit', event => {
+            event.preventDefault();
+            const userId = document.getElementById('editUserId').value;
+            const email = document.getElementById('editUserEmail').value;
+            const password = document.getElementById('editUserPassword').value;
+            const userRef = database.ref(`users/${userId}`);
+            userRef.update({ email: email, password: password });
+            closeEditUserModal();
+        });
+    
+        function deleteUser(userId) {
+            if (confirm('Are you sure you want to delete this user?')) {
+                database.ref(`users/${userId}`).remove();
+            }
+        }
+    
+        // Transactions Management
+        function loadTransactions() {
+            const transactionTableBody = document.getElementById('transactionTableBody');
+            database.ref('transactions').on('value', snapshot => {
+                transactionTableBody.innerHTML = '';
+                snapshot.forEach(transactionSnapshot => {
+                    const transaction = transactionSnapshot.val();
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${transaction.id}</td>
+                        <td>${transaction.user}</td>
+                        <td>${transaction.amount}</td>
+                        <td>${new Date(transaction.date).toLocaleString()}</td>
+                    `;
+                    transactionTableBody.appendChild(tr);
+                });
+            });
+        }
+    
+       // Load withdrawal requests
+       function loadWithdrawalRequests() {
+            const withdrawalRequestsTableBody = document.getElementById('withdrawalRequestsTableBody');
+            database.ref('withdrawals').on('value', snapshot => {
+                withdrawalRequestsTableBody.innerHTML = '';
+                snapshot.forEach(userWithdrawalsSnapshot => {
+                    userWithdrawalsSnapshot.forEach(withdrawalRequestSnapshot => {
+                        const requestId = withdrawalRequestSnapshot.key;
+                        const withdrawalRequest = withdrawalRequestSnapshot.val();
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${requestId}</td>
+                            <td>${withdrawalRequest.userId}</td>
+                            <td>${withdrawalRequest.amount}</td>
+                            <td>${new Date(withdrawalRequest.timestamp).toLocaleString()}</td>
+                            <td>${withdrawalRequest.status}</td>
+                            <td>
+                                <button onclick="approveWithdrawalRequest('${userWithdrawalsSnapshot.key}', '${requestId}')">Approve</button>
+                                <button onclick="denyWithdrawalRequest('${userWithdrawalsSnapshot.key}', '${requestId}')">Deny</button>
+                            </td>
+                        `;
+                        withdrawalRequestsTableBody.appendChild(tr);
+                    });
+                });
+            });
+        }
+
+        function approveWithdrawalRequest(userId, requestId) {
+            const requestRef = database.ref(`withdrawals/${userId}/${requestId}`);
+            requestRef.update({ status: 'approved' }).then(() => {
+                requestRef.once('value').then(snapshot => {
+                    const request = snapshot.val();
+                    const userRef = database.ref(`users/${request.userId}`);
+                    userRef.child('balance').transaction(balance => {
+                        return (balance || 0) - request.amount;
+                    });
+                });
+            });
+        }
+
+        function denyWithdrawalRequest(userId, requestId) {
+            const requestRef = database.ref(`withdrawals/${userId}/${requestId}`);
+            requestRef.update({ status: 'denied' });
+        }
+
+        // Load withdrawal requests when the page loads
+        window.onload = function() {
+            loadWithdrawalRequests();
+        };
+    
+        // Load initial data
+        loadDashboard();
+        loadCategories();
+        loadUsers();
+        loadTransactions();
+        loadWithdrawalRequests();
+    </script>    
+</body>
+</html>

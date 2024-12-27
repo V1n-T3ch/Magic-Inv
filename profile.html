@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-database.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }
+        header { background-color: #3498db; color: white; padding: 20px 0; text-align: center; font-size: 24px; }
+        .container { max-width: 900px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
+        .profile-header { text-align: center; margin-bottom: 20px; }
+        .profile-header img { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #3498db; }
+        .profile-header h2 { margin-top: 10px; font-size: 28px; }
+        .profile-details { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; font-size: 18px; }
+        .profile-details span { font-weight: bold; }
+        .button-group { display: flex; justify-content: space-between; gap: 10px; }
+        .button-group button { flex: 1; padding: 15px; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        .button-group button:hover { background-color: #2980b9; }
+        .logout-btn { display: block; text-align: center; margin-top: 20px; padding: 10px; background-color: #e74c3c; color: white; text-decoration: none; border-radius: 4px; font-size: 16px; transition: background-color 0.3s; }
+        .logout-btn:hover { background-color: #c0392b; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); animation: slideIn 0.3s ease-in-out; }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-content h2 { margin-top: 0; text-align: center; color: #3498db; }
+        .modal-content input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .modal-content button { width: 100%; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        .modal-content button:hover { background-color: #2980b9; }
+        .close-modal { text-align: right; font-size: 18px; cursor: pointer; color: #e74c3c; }
+        .close-modal:hover { color: #c0392b; }
+        .withdrawals-container { margin-top: 20px; }
+        .withdrawals-container h3 { text-align: center; color: #3498db; }
+        .withdrawals-list { list-style: none; padding: 0; }
+        .withdrawals-list li { padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>User Profile</h1>
+    </header>
+    <div class="container">
+     <h2 id="username">Fetching...</h2>
+        </div>
+        <div class="profile-details">
+            <p><span>Email:</span> <span id="email">Fetching...</span></p>
+            <p><span>Phone Number:</span> <span id="phoneNumber">Fetching...</span></p>
+            <p><span>Account Balance:</span> <span id="accountBalance">Fetching...</span></p>
+        </div>
+        <div class="button-group">
+            <button onclick="openModal('depositModal')">Deposit</button>
+            <button onclick="openModal('withdrawModal')">Withdraw</button>
+            <button onclick="window.location.href='dashboard2.html';">Buy Product</button>
+        </div>
+        <a href="index.html" class="logout-btn" onclick="logout()">Logout</a>
+        <div class="withdrawals-container">
+            <h3>Withdrawal Requests</h3>
+            <ul id="withdrawalsList" class="withdrawals-list"></ul>
+        </div>
+    </div>
+    <div class="modal" id="depositModal">
+        <div class="modal-content">
+            <h2>Deposit Funds</h2>
+            <p>Paybill Code: <strong>522522</strong></p>
+            <p>Account: <strong>7894198</strong></p>
+            <input type="text" id="depositPhone" placeholder="Enter your phone number">
+            <button onclick="closeModal('depositModal')">Close</button>
+        </div>
+    </div>
+    <div class="modal" id="withdrawModal">
+        <div class="modal-content">
+            <h2>Withdraw Funds</h2>
+            <input type="number" id="withdrawAmount" placeholder="Enter withdrawal amount">
+            <button onclick="submitWithdrawal()">Submit Withdrawal</button>
+        </div>
+    </div>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAfxNnPpP1Bq2sVwmJAuzc286ixJcxf9Nc",
+            authDomain: "website1-51acf.firebaseapp.com",
+            databaseURL: "https://website1-51acf-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "website1-51acf",
+            storageBucket: "website1-51acf.appspot.com",
+            messagingSenderId: "138128926583",
+            appId: "1:138128926583:web:32f70db609d295ee8a2372",
+            measurementId: "G-9Y3WFTRN6B"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+        let userData;
+
+        auth.onAuthStateChanged(async user => {
+            if (user) {
+                try {
+                    const userDetails = await db.ref('users/' + user.uid).once('value');
+                    if (userDetails.exists()) {
+                        userData = userDetails.val();
+                        document.getElementById("username").textContent = userData.name || "Anonymous";
+                        document.getElementById("email").textContent = user.email || "Not provided";
+                        document.getElementById("phoneNumber").textContent = userData.phone || "Not provided";
+                        document.getElementById("accountBalance").textContent = userData.balance || "0";
+                        document.getElementById("investmentCapital").textContent = userData.investmentCapital || "Not available";
+                        fetchWithdrawals(user.uid);
+                    } else {
+                        console.error("No user data found.");
+                    }
+                } catch (error) {
+                    console.error("Error fetching user details:", error);
+                }
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        function openModal(modalId) { document.getElementById(modalId).style.display = "flex"; }
+        function closeModal(modalId) { document.getElementById(modalId).style.display = "none"; }
+
+        function logout() { auth.signOut(); }
+ // Fetch withdrawals for the current user
+ function fetchWithdrawals(userId) {
+            db.ref('withdrawals/' + userId).once('value').then(snapshot => {
+                const withdrawalsList = document.getElementById("withdrawalsList");
+                withdrawalsList.innerHTML = "";
+                snapshot.forEach(withdrawal => {
+                    const li = document.createElement('li');
+                    li.textContent = `Amount: ${withdrawal.val().amount} | Status: ${withdrawal.val().status}`;
+                    withdrawalsList.appendChild(li);
+                });
+            }).catch(error => {
+                console.error("Error fetching withdrawals:", error);
+            });
+        }
+
+        // Submit a withdrawal request
+        function submitWithdrawal() {
+            const amount = parseFloat(document.getElementById('withdrawAmount').value);
+            const user = auth.currentUser;
+            if (!user) {
+                alert("You must be logged in to request a withdrawal");
+                return;
+            }
+
+            const userId = user.uid;
+            db.ref('users/' + userId + '/balance').once('value').then(snapshot => {
+                const balance = snapshot.val();
+                if (isNaN(amount) || amount <= 0 || amount > balance) {
+                    alert("Invalid withdrawal amount");
+                    return;
+                }
+
+                const withdrawalData = {
+                    userId,
+                    amount,
+                    status: 'Pending',
+                    timestamp: new Date().toISOString()
+                };
+
+                const newWithdrawalKey = db.ref('withdrawals/' + userId).push().key;
+                const updates = {};
+                updates['/withdrawals/' + userId + '/' + newWithdrawalKey] = withdrawalData;
+                db.ref().update(updates, error => {
+                    if (error) {
+                        console.error("Error submitting withdrawal:", error);
+                    } else {
+                        alert("Withdrawal request submitted");
+                        closeModal('withdrawModal');
+                        fetchWithdrawals(userId);
+                    }
+                });
+            }).catch(error => {
+                console.error("Error fetching user balance:", error);
+            });
+        }
+
+        // Open a modal
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = "block";
+        }
+
+        // Close a modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = "none";
+        }
+
+        // Check if user is logged in and fetch withdrawals
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                fetchWithdrawals(user.uid);
+            }
+        });
+        
+    </script>
+</body>
+</html>

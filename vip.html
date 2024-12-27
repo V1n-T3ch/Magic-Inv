@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-auth.js"></script>
+    <title>VIP Products</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        header {
+            background-color: #4CAF50;
+            padding: 10px 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .product-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .product-item {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            flex: 1 1 calc(25% - 20px);
+            max-width: calc(25% - 20px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .product-item button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .product-item button:hover {
+            background-color: #45a049;
+        }
+
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            padding: 10px 0;
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content input {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .modal-content button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .modal-content button:hover {
+            background-color: #45a049;
+        }
+
+        .balance-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .balance-container p {
+            font-size: 18px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>VIP Products</h1>
+    <p>Exclusive high-return investments</p>
+    <p id="userBalance">Balance: KES 0</p>
+</header>
+<div class="container">
+    <div class="product-list" id="vipProductList">
+        <!-- Products will be dynamically inserted here -->
+    </div>
+</div>
+
+<footer>
+    <p>&copy; 2024 Magic Investments. All rights reserved.</p>
+</footer>
+
+<!-- Modal -->
+<div class="modal" id="paymentModal">
+    <div class="modal-content">
+        <h3>Confirm Investment</h3>
+        <p id="selectedProductDetails"></p>
+        <input type="number" id="investmentAmount" placeholder="Enter amount to invest" min="1" required>
+        <button id="confirmPaymentBtn">Confirm & Pay</button>
+        <button onclick="closeModal()">Cancel</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAfxNnPpP1Bq2sVwmJAuzc286ixJcxf9Nc",
+        authDomain: "website1-51acf.firebaseapp.com",
+        databaseURL: "https://website1-51acf-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "website1-51acf",
+        storageBucket: "website1-51acf.appspot.com",
+        messagingSenderId: "138128926583",
+        appId: "1:138128926583:web:32f70db609d295ee8a2372",
+        measurementId: "G-9Y3WFTRN6B"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const auth = firebase.auth();
+
+    let userId = null;
+    let userBalance = 0;
+    let investments = [];
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            userId = user.uid;
+            const userRef = database.ref('users/' + userId);
+
+            userRef.once('value').then(snapshot => {
+                if (snapshot.exists()) {
+                    userBalance = snapshot.val().balance;
+                    investments = snapshot.val().investments || [];
+                    updateBalanceDisplay();
+                    loadVipProducts();
+                    simulateInvestmentReturns();
+                } else {
+                    console.error("No such user record!");
+                }
+            }).catch(error => {
+                console.error("Error fetching user data: ", error);
+            });
+        } else {
+            window.location.href = "/login"; // Redirect to login page if not authenticated
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const vipProducts = [
+            {
+                name: "Luxury Watch",
+                price: 20000,
+                description: "Invest in an elegant luxury watch with a 10% daily return.",
+                dailyReturn: 8,
+                imageUrl: "g3.jpeg"
+            },
+            {
+                name: "Premium Wine",
+                price: 25000,
+                description: "Premium wine investment with a 10% daily return.",
+                dailyReturn: 10,
+                imageUrl: "g4.jpeg"
+            },
+            {
+                name: "Gold Coin",
+                price: 30000,
+                description: "Secure gold investment with a 10% daily return.",
+                dailyReturn: 20,
+                imageUrl: "g1.jpeg"
+            },
+            {
+                name: "Luxury Handbag",
+                price: 20000,
+                description: "Invest in a high-demand luxury handbag with 10% daily returns.",
+                dailyReturn: 5,
+                imageUrl: "g2.jpeg"
+            }
+        ];
+
+        function loadVipProducts() {
+            const productList = document.getElementById("vipProductList");
+
+            vipProducts.forEach(product => {
+                const productItem = document.createElement("div");
+                productItem.className = "product-item";
+                productItem.innerHTML = `
+                    <img src="${product.imageUrl}" alt="${product.name}">
+                    <h4>${product.name}</h4>
+                    <p><strong>Description:</strong> ${product.description}</p>
+                    <p><strong>Price:</strong> KES ${product.price.toLocaleString()}</p>
+                    <p><strong>Daily Return:</strong> ${product.dailyReturn}%</p>
+                    <button onclick="openModal('${product.name}', ${product.price}, ${product.dailyReturn})">Invest Now</button>
+                `;
+                productList.appendChild(productItem);
+            });
+        }
+
+        loadVipProducts();
+    });
+
+    function openModal(productName, productPrice, dailyReturn) {
+        const modal = document.getElementById("paymentModal");
+        const productDetails = document.getElementById("selectedProductDetails");
+        const confirmPaymentBtn = document.getElementById("confirmPaymentBtn");
+
+        productDetails.textContent = `You are investing in ${productName} with a price of KES ${productPrice.toLocaleString()}`;
+        modal.style.display = "block";
+
+        confirmPaymentBtn.onclick = function () {
+            const investmentAmount = parseFloat(document.getElementById("investmentAmount").value);
+
+            if (isNaN(investmentAmount) || investmentAmount <= 0) {
+                alert("Please enter a valid investment amount.");
+                return;
+            }
+            if (investmentAmount > userBalance) {
+                alert("Insufficient balance. Redirecting to profile page...");
+                window.location.href = "profile.html"; // Redirect to profile.html if balance is insufficient
+                return;
+            }
+            initiatePayment(productName, productPrice, investmentAmount, dailyReturn);
+        };
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("paymentModal");
+        modal.style.display = "none";
+    }
+
+    function initiatePayment(productName, productPrice, amount, dailyReturn) {
+        processPayment(productName, productPrice, amount, dailyReturn);
+    }
+
+    function processPayment(productName, productPrice, amount, dailyReturn) {
+        const newBalance = userBalance - amount;
+
+        // Simulate balance update
+        userBalance = newBalance;
+        updateBalanceDisplay();
+        alert(`Successfully invested KES ${amount} in ${productName}.`);
+
+        // Update investments and balance in Firebase Realtime Database
+        investments.push({ productName, amount, dailyReturn, timestamp: Date.now() });
+        database.ref('users/' + userId).update({
+            balance: newBalance,
+            investments: investments
+        }).then(() => {
+            console.log("Investment and balance updated successfully in Firebase.");
+        }).catch(error => {
+            console.error("Error updating investment and balance in Firebase: ", error);
+        });
+
+        closeModal();
+    }
+
+    function simulateInvestmentReturns() {
+        setInterval(() => {
+            const now = Date.now();
+            investments.forEach(investment => {
+                const elapsedSeconds = (now - investment.timestamp) / 1000;
+                const dailyReturn = investment.dailyReturn;
+                const returnRatePerSecond = dailyReturn / 86400;
+                const earnedAmount = investment.amount * returnRatePerSecond * elapsedSeconds;
+
+                userBalance += earnedAmount;
+                investment.timestamp = now; // reset timestamp for next calculation
+            });
+            updateBalanceDisplay();
+
+            // Update balance in Firebase
+            database.ref('users/' + userId).update({
+                balance: userBalance,
+                investments: investments
+            }).then(() => {
+                console.log("Balance updated with returns in Firebase.");
+            }).catch(error => {
+                console.error("Error updating balance with returns in Firebase: ", error);
+            });
+        }, 10000); // 10 seconds interval
+    }
+
+    function updateBalanceDisplay() {
+        const balanceElement = document.getElementById("userBalance");
+        balanceElement.innerText = `Balance: KES ${userBalance.toLocaleString()}`;
+    }
+</script>
+
+</body>
+</html>
